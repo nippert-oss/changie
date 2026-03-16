@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>체인지 — 업종변경 진단</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height:100%; overflow:hidden; background:#0d0d0d; }
+body { font-family:'Noto Sans KR', sans-serif; color:#f0ece3; }
+
+/* ── 전체 컨테이너 ── */
+.app {
+  width:100%; height:100%;
+  display:flex; flex-direction:column;
+  position:relative; overflow:hidden;
+}
+
+/* ── 배경 ── */
+.bg {
+  position:fixed; inset:0; z-index:0;
+  background: radial-gradient(ellipse 80% 60% at 50% 30%, rgba(201,168,76,0.06) 0%, transparent 60%),
+              linear-gradient(180deg, #0d0d0d 0%, #111108 100%);
+}
+.bg-grid {
+  position:fixed; inset:0; z-index:0;
+  background-image:
+    linear-gradient(rgba(201,168,76,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201,168,76,0.03) 1px, transparent 1px);
+  background-size:48px 48px;
+}
+
+/* ── 프로그레스 바 ── */
+.progress-bar {
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  height:3px; background:rgba(255,255,255,0.06);
+}
+.progress-fill {
+  height:100%; background:var(--gold,#c9a84c);
+  transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ── 스텝 래퍼 ── */
+.steps {
+  position:relative; z-index:10;
+  width:100%; height:100%;
+}
+.step {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column;
+  justify-content:center; align-items:center;
+  padding:2rem 1.6rem;
+  opacity:0; pointer-events:none;
+  transform:translateX(60px);
+  transition: opacity 0.45s cubic-bezier(0.4,0,0.2,1),
+              transform 0.45s cubic-bezier(0.4,0,0.2,1);
+}
+.step.active {
+  opacity:1; pointer-events:all; transform:translateX(0);
+}
+.step.out {
+  opacity:0; transform:translateX(-60px);
+}
+.step-inner {
+  width:100%; max-width:480px;
+}
+
+/* ── 스텝 번호 ── */
+.step-num {
+  font-size:0.68rem; letter-spacing:0.25em; color:rgba(201,168,76,0.6);
+  text-transform:uppercase; margin-bottom:1.4rem;
+  display:flex; align-items:center; gap:0.6rem;
+}
+.step-num::before { content:''; width:24px; height:1px; background:rgba(201,168,76,0.4); display:block; }
+
+/* ── 질문 텍스트 ── */
+.step-q {
+  font-family:'Noto Serif KR', serif;
+  font-size:clamp(1.7rem, 6vw, 2.4rem);
+  line-height:1.2; letter-spacing:-0.02em;
+  color:#f0ece3; margin-bottom:0.8rem;
+  word-break:keep-all;
+}
+.step-q .gold { color:#c9a84c; }
+.step-sub {
+  font-size:0.88rem; color:rgba(240,236,227,0.45);
+  line-height:1.7; margin-bottom:2.2rem;
+}
+
+/* ── 선택지 버튼 ── */
+.choices { display:flex; flex-direction:column; gap:0.75rem; width:100%; }
+.choice-btn {
+  width:100%;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:12px;
+  padding:1rem 1.2rem;
+  color:#f0ece3;
+  font-family:'Noto Sans KR', sans-serif;
+  font-size:0.95rem; font-weight:500;
+  text-align:left; cursor:pointer;
+  display:flex; align-items:center; gap:0.9rem;
+  min-height:80px;
+  transition: all 0.2s;
+  position:relative; overflow:hidden;
+}
+.choice-btn::before {
+  content:'';
+  position:absolute; inset:0;
+  background:rgba(201,168,76,0.08);
+  opacity:0; transition:opacity 0.2s;
+}
+.choice-btn:hover { border-color:rgba(201,168,76,0.4); transform:translateY(-1px); }
+.choice-btn:hover::before { opacity:1; }
+.choice-btn:active { transform:scale(0.98); }
+.choice-btn.selected {
+  border-color:#c9a84c;
+  background:rgba(201,168,76,0.1);
+}
+.choice-icon {
+  font-size:1.2rem; flex-shrink:0;
+  width:38px; height:38px;
+  min-width:38px;
+  background:rgba(255,255,255,0.05);
+  border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  align-self:flex-start; margin-top:2px;
+}
+.choice-label { flex:1; }
+.choice-label strong { display:block; font-weight:700; font-size:0.88rem; margin-bottom:0.25rem; line-height:1.3; word-break:keep-all; overflow-wrap:break-word; }
+.choice-label span { font-size:0.73rem; color:rgba(240,236,227,0.45); line-height:1.5; display:block; word-break:keep-all; overflow-wrap:break-word; }
+.choice-arrow {
+  color:rgba(201,168,76,0.4); font-size:0.9rem;
+  opacity:0; transition:opacity 0.2s;
+}
+.choice-btn:hover .choice-arrow { opacity:1; }
+
+/* ── 입력 폼 스텝 ── */
+.input-group { display:flex; flex-direction:column; gap:0.9rem; width:100%; margin-bottom:1.4rem; }
+.input-wrap { position:relative; }
+.input-label {
+  font-size:0.72rem; letter-spacing:0.1em; color:rgba(201,168,76,0.7);
+  text-transform:uppercase; margin-bottom:0.5rem; display:block;
+}
+.input-req { color:#c9a84c; margin-left:2px; }
+.app-input {
+  width:100%;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:10px;
+  color:#f0ece3;
+  padding:0.9rem 1.1rem;
+  font-family:'Noto Sans KR', sans-serif;
+  font-size:1rem; /* 모바일 줌 방지 */
+  outline:none;
+  transition:border-color 0.2s, box-shadow 0.2s;
+}
+.app-input:focus {
+  border-color:rgba(201,168,76,0.5);
+  box-shadow:0 0 0 3px rgba(201,168,76,0.08);
+}
+.app-input::placeholder { color:rgba(240,236,227,0.2); }
+
+/* ── CTA 버튼 ── */
+.cta-btn {
+  width:100%; padding:1.1rem;
+  background:#c9a84c; color:#0d0d0d;
+  font-family:'Noto Sans KR', sans-serif;
+  font-size:1rem; font-weight:700;
+  border:none; border-radius:12px; cursor:pointer;
+  transition:all 0.2s;
+  box-shadow:0 4px 20px rgba(201,168,76,0.25);
+  position:relative; overflow:hidden;
+}
+.cta-btn:hover { background:#e0bc60; transform:translateY(-1px); }
+.cta-btn:active { transform:scale(0.98); }
+.cta-btn:disabled { background:rgba(201,168,76,0.3); color:rgba(0,0,0,0.4); cursor:default; transform:none; }
+
+/* ── 뒤로가기 ── */
+.back-btn {
+  position:fixed; top:1.2rem; left:1.4rem; z-index:50;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:50%; width:40px; height:40px;
+  color:rgba(240,236,227,0.5);
+  font-size:1rem; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.2s;
+  opacity:0; pointer-events:none;
+}
+.back-btn.visible { opacity:1; pointer-events:all; }
+.back-btn:hover { border-color:rgba(201,168,76,0.4); color:#c9a84c; }
+
+/* ── 완료 화면 ── */
+.done-icon {
+  width:72px; height:72px;
+  background:rgba(201,168,76,0.1);
+  border:1px solid rgba(201,168,76,0.3);
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:2rem; margin:0 auto 1.8rem;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { box-shadow:0 0 0 0 rgba(201,168,76,0.2); }
+  50%      { box-shadow:0 0 0 12px rgba(201,168,76,0); }
+}
+.done-title {
+  font-family:'Noto Serif KR', serif;
+  font-size:1.9rem; color:#f0ece3;
+  text-align:center; margin-bottom:0.8rem;
+  letter-spacing:-0.02em;
+}
+.done-sub {
+  font-size:0.9rem; color:rgba(240,236,227,0.5);
+  text-align:center; line-height:1.8; margin-bottom:2rem;
+}
+.done-info {
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px; padding:1.4rem;
+  display:flex; flex-direction:column; gap:0.9rem;
+  margin-bottom:1.6rem;
+}
+.done-item {
+  display:flex; align-items:flex-start; gap:0.8rem;
+  font-size:0.88rem; color:rgba(240,236,227,0.6);
+}
+.done-item-icon {
+  width:34px; height:34px; min-width:34px;
+  background:rgba(201,168,76,0.1);
+  border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:0.9rem; flex-shrink:0;
+  margin-top:2px;
+}
+.done-item strong { color:#f0ece3; }
+.call-btn {
+  width:100%; padding:1.1rem;
+  background:transparent;
+  border:1px solid rgba(201,168,76,0.4);
+  border-radius:12px; cursor:pointer;
+  color:#c9a84c;
+  font-family:'Noto Sans KR', sans-serif;
+  font-size:0.95rem; font-weight:600;
+  transition:all 0.2s;
+  text-decoration:none; display:block; text-align:center;
+}
+.call-btn:hover { background:rgba(201,168,76,0.08); }
+
+/* ── 인트로 화면 ── */
+.intro-badge {
+  display:inline-flex; align-items:center; gap:0.8rem;
+  color:#c9a84c; font-size:0.72rem; font-weight:400;
+  margin-bottom:1.8rem; letter-spacing:0.22em;
+  text-transform:uppercase;
+}
+.intro-badge::before {
+  content:''; display:block; width:36px; height:1px; background:#c9a84c;
+}
+.intro-title {
+  font-family:'Noto Serif KR', serif;
+  font-size:clamp(2rem, 7vw, 2.8rem);
+  line-height:1.15; letter-spacing:-0.02em;
+  margin-bottom:1rem;
+}
+.intro-title .gold { color:#c9a84c; }
+.intro-body {
+  font-size:0.9rem; line-height:1.85;
+  color:rgba(240,236,227,0.5);
+  margin-bottom:0.6rem;
+}
+.intro-free {
+  display:inline-flex; align-items:center; gap:0.4rem;
+  font-size:0.82rem; color:rgba(201,168,76,0.8); font-weight:600;
+  margin-bottom:2.2rem;
+}
+.intro-free::before { content:'✦'; }
+.intro-time {
+  font-size:0.75rem; color:rgba(240,236,227,0.25);
+  text-align:center; margin-top:0.9rem;
+  letter-spacing:0.05em;
+}
+
+  .service-link {
+    display:block; text-align:center;
+    margin-top:1rem;
+    font-size:0.83rem; color:rgba(240,236,227,0.3);
+    text-decoration:none;
+    transition:color 0.2s;
+  }
+  .service-link:hover { color:rgba(201,168,76,0.6); }
+
+  /* ── 서비스 상세 섹션 ── */
+  #service-detail { overflow-y:auto; }
+  #service-detail * { word-break:keep-all; }
+  .detail-section { padding:3rem 1.6rem; max-width:520px; margin:0 auto; }
+  .detail-eyebrow { font-size:0.68rem; letter-spacing:0.28em; text-transform:uppercase; color:rgba(201,168,76,0.6); margin-bottom:0.6rem; }
+  .detail-title { font-family:'Noto Serif KR', serif; font-size:1.8rem; font-weight:900; margin-bottom:0.6rem; letter-spacing:-0.02em; }
+  .detail-sub { font-size:0.85rem; color:rgba(240,236,227,0.4); line-height:1.7; margin-bottom:2rem; }
+
+  .free-banner {
+    display:flex; align-items:center; gap:1rem;
+    background:linear-gradient(135deg, rgba(201,168,76,0.1), rgba(201,168,76,0.04));
+    border:1px solid rgba(201,168,76,0.35); border-left:4px solid #c9a84c;
+    padding:1.2rem; border-radius:10px; margin-bottom:2.4rem;
+  }
+  .free-banner-icon { font-size:1.4rem; color:#c9a84c; flex-shrink:0; }
+  .free-banner-title { font-size:0.95rem; font-weight:700; color:#f0ece3; margin-bottom:0.2rem; }
+  .free-banner-sub { font-size:0.73rem; color:rgba(201,168,76,0.6); letter-spacing:0.06em; }
+
+  .svc-list { display:flex; flex-direction:column; gap:1px; background:rgba(201,168,76,0.08); border-radius:12px; overflow:hidden; }
+  .svc-item { background:#111108; padding:1.4rem; }
+  .svc-item.highlight-card { background:rgba(201,168,76,0.05); border-left:3px solid #c9a84c; }
+  .svc-top { display:flex; align-items:center; gap:0.6rem; margin-bottom:0.5rem; }
+  .svc-num { font-size:0.65rem; font-weight:900; color:rgba(201,168,76,0.4); letter-spacing:0.1em; }
+  .svc-tag { font-size:0.65rem; font-weight:700; letter-spacing:0.1em; color:#c9a84c; background:rgba(201,168,76,0.08); border:1px solid rgba(201,168,76,0.2); padding:0.15rem 0.55rem; border-radius:100px; }
+  .svc-name { font-size:0.95rem; font-weight:700; margin-bottom:0.4rem; color:#f0ece3; }
+  .svc-desc { font-size:0.8rem; color:rgba(240,236,227,0.45); line-height:1.7; word-break:keep-all; }
+
+  .process-list { display:flex; flex-direction:column; }
+  .process-item { display:flex; gap:1rem; }
+  .process-left { display:flex; flex-direction:column; align-items:center; width:32px; flex-shrink:0; }
+  .process-step-num { width:32px; height:32px; border-radius:50%; border:1.5px solid rgba(201,168,76,0.4); display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700; color:#c9a84c; flex-shrink:0; }
+  .process-line { width:1px; flex:1; background:rgba(201,168,76,0.15); margin:4px 0; min-height:24px; }
+  .process-right { padding-bottom:1.6rem; flex:1; }
+  .process-header { display:flex; align-items:center; gap:0.6rem; margin-bottom:0.3rem; margin-top:0.4rem; }
+  .process-name { font-size:0.9rem; font-weight:700; color:#f0ece3; }
+  .process-duration { font-size:0.72rem; font-weight:800; background:rgba(201,168,76,0.15); color:#c9a84c; border:1px solid rgba(201,168,76,0.4); padding:0.25rem 0.7rem; border-radius:100px; white-space:nowrap; letter-spacing:0.05em; }
+  .process-desc { font-size:0.78rem; color:rgba(240,236,227,0.4); line-height:1.65; word-break:keep-all; }
+
+  .why-list { display:flex; flex-direction:column; gap:1px; background:rgba(255,255,255,0.04); border-radius:12px; overflow:hidden; }
+  .why-card { background:#111108; padding:1.4rem; border-top:2px solid transparent; }
+  .why-icon { font-size:1.4rem; margin-bottom:0.6rem; }
+  .why-name { font-size:0.95rem; font-weight:700; color:#f0ece3; margin-bottom:0.4rem; }
+  .why-desc { font-size:0.8rem; color:rgba(240,236,227,0.45); line-height:1.7; word-break:keep-all; }
+</style>
+
+  <!-- OG / 카카오톡 미리보기 -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="위기의 가맹점을 새로운 기회로 바꾸다">
+  <meta property="og:description" content="지금 매장에 맞는 브랜드를 찾아드립니다. 1분이면 답 나옵니다. 가맹점주님께 별도 비용 없습니다.">
+  <meta property="og:image" content="./og-image.png">
+  <meta property="og:url" content="">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#0d0d0d">
+</head>
+<body>
+
+<div class="bg"></div>
+<div class="bg-grid"></div>
+
+<!-- 프로그레스 바 -->
+<div class="progress-bar">
+  <div class="progress-fill" id="progress" style="width:0%"></div>
+</div>
+
+<!-- 뒤로가기 -->
+<button class="back-btn" id="back-btn" onclick="prevStep()">←</button>
+
+<div class="app">
+  <div class="steps" id="steps">
+
+    <!-- STEP 0: 인트로 -->
+    <div class="step active" data-step="0">
+      <div class="step-inner">
+        <div class="intro-badge">── 프랜차이즈 업종전환 전문</div>
+        <h1 class="intro-title">
+          위기의 가맹점을<br><span class="gold">새로운 기회로</span><br>바꾸다
+        </h1>
+        <p class="intro-body">
+          매출 하락, 폐업 위기, 계약 갈등—<br>
+          지금 상황을 정확히 진단하고<br>최적의 업종전환 경로를 설계해 드립니다.
+        </p>
+        <div class="intro-free">가맹점주님께 별도 비용은 없습니다</div>
+        <button class="cta-btn" onclick="nextStep()">
+          <span>지금 바로 상담 신청하기 →</span>
+        </button>
+        <div class="intro-time">약 1분 소요</div>
+      </div>
+    </div>
+
+    <!-- STEP 1: 현재 상황 -->
+    <div class="step" data-step="1">
+      <div class="step-inner">
+        <div class="step-num">01 / 04</div>
+        <h2 class="step-q">지금 가장 <span class="gold">힘든 점</span>이<br>뭔가요?</h2>
+        <p class="step-sub">해당하는 상황을 선택해 주세요</p>
+        <div class="choices">
+          <button class="choice-btn" onclick="selectChoice(this, 1)">
+            <div class="choice-icon">📉</div>
+            <div class="choice-label">
+              <strong>매출이 계속 떨어지고 있다</strong>
+              <span>손익분기점도 못 맞추는 상황</span>
+            </div>
+            <span class="choice-arrow">→</span>
+          </button>
+          <button class="choice-btn" onclick="selectChoice(this, 1)">
+            <div class="choice-icon">⚖️</div>
+            <div class="choice-label">
+              <strong>본사와 갈등이 생겼다</strong>
+              <span>계약 조건, 지원 문제 등</span>
+            </div>
+            <span class="choice-arrow">→</span>
+          </button>
+          <button class="choice-btn" onclick="selectChoice(this, 1)">
+            <div class="choice-icon">🏚️</div>
+            <div class="choice-label">
+              <strong>이 업종 자체가 안 맞는다</strong>
+              <span>처음부터 잘못된 선택이었던 것 같다</span>
+            </div>
+            <span class="choice-arrow">→</span>
+          </button>
+          <button class="choice-btn" onclick="selectChoice(this, 1)">
+            <div class="choice-icon">💸</div>
+            <div class="choice-label">
+              <strong>고정비를 감당하기 어렵다</strong>
+              <span>임대료, 인건비, 로열티 등</span>
+            </div>
+            <span class="choice-arrow">→</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: 망설이는 이유 -->
+    <div class="step" data-step="2">
+      <div class="step-inner">
+        <div class="step-num">02 / 04</div>
+        <h2 class="step-q">업종변경을<br><span class="gold">망설이는 이유</span>가 뭔가요?</h2>
+        <p class="step-sub">지금 가장 걱정되는 부분을 선택해 주세요</p>
+        <div class="choices">
+          <button class="choice-btn" onclick="selectChoice(this, 2)">
+            <div class="choice-icon">😔</div>
+            <div class="choice-label">
+              <strong>이미 매장에 돈을 많이 썼다</strong>
+              <span>또 공사 비용 쓸 여력이 없다</span>
+            </div>
+            <span class="choice-arrow">→</span>
+          </button>
+          <button class="choice-btn" onclick="selectChoice(this, 2)">
+            <div class="choice-icon">📍</div>
+            <div class="choice-label">
+              <strong>이 자리에 뭐가 맞는지 모르겠다</strong>
+              <span>상권도 모르고 감이 안 잡힌다</span>
+            </div>
+            <span class="choice-arrow">→</span>
+          </button>
+          <button class="choice-btn" onclick="selectChoice(this, 2)">
+            <div class="choice-icon">🚫</div>
+            <div class="choice-label">
+              <strong>또 돈만 뜯길까봐 무섭다</strong>
+              <span>상담받다가 비용만 나올까봐 꺼려진다</span>
+            </div>
+            <span class="choice-arrow">→</span>
+          </button>
+          <button class="choice-btn" onclick="selectChoice(this, 2)">
+            <div class="choice-icon">😵</div>
+            <div class="choice-label">
+              <strong>지금 너무 힘들어서 뭘 해야 할지 모르겠다</strong>
+              <span>어디서부터 시작해야 할지 막막하다</span>
+            </div>
+            <span class="choice-arrow">→</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2.5: 서비스 힌트 -->
+    <div class="step" data-step="25">
+      <div class="step-inner" style="text-align:center;">
+        <div style="font-size:2.2rem; margin-bottom:1.2rem;">🎯</div>
+        <h2 class="step-q" style="text-align:center;">잠깐,<br><span class="gold">어떻게 찾아드리는지</span><br>궁금하세요?</h2>
+        <p class="step-sub" style="text-align:center; margin-bottom:2rem;">저희가 어떤 방식으로 일하는지<br>먼저 보고 결정하세요.</p>
+        <a href="./index.html#services" target="_self" 
+           style="display:block; width:100%; padding:1rem; background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.35); border-radius:12px; color:#c9a84c; font-size:0.92rem; font-weight:600; text-decoration:none; margin-bottom:1rem; transition:all 0.2s;">
+          서비스 자세히 보기 →
+        </a>
+        <button class="cta-btn" onclick="nextStep()">괜찮아요, 계속 진행할게요</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: 희망 업종 -->
+    <div class="step" data-step="3">
+      <div class="step-inner">
+        <div class="step-num">03 / 04</div>
+        <h2 class="step-q">생각하시는 <span class="gold">업종</span>이<br>있나요?</h2>
+        <p class="step-sub">없어도 괜찮습니다. 저희가 찾아드립니다</p>
+        <div class="choices">
+          <button class="choice-btn" onclick="selectChoice(this, 3)">
+            <div class="choice-icon">🍱</div>
+            <div class="choice-label">
+              <strong>음식·카페</strong>
+              <span>외식, 베이커리, 음료 등</span>
+            </div>
+            <span class="choice-arrow">→</span>
+          </button>
+          <button class="choice-btn" onclick="selectChoice(this, 3)">
+            <div class="choice-icon">🛍️</div>
+            <div class="choice-label">
+              <strong>편의점·생활</strong>
+              <span>편의점, 세탁, 반려동물 등</span>
+            </div>
+            <span class="choice-arrow">→</span>
+          </button>
+          <button class="choice-btn" onclick="selectChoice(this, 3)">
+            <div class="choice-icon">💆</div>
+            <div class="choice-label">
+              <strong>뷰티·헬스</strong>
+              <span>네일, 피부, 헬스장 등</span>
+            </div>
+            <span class="choice-arrow">→</span>
+          </button>
+          <button class="choice-btn" onclick="selectChoice(this, 3)">
+            <div class="choice-icon">🤷</div>
+            <div class="choice-label">
+              <strong>아직 모르겠다</strong>
+              <span>상담 후 결정하고 싶다</span>
+            </div>
+            <span class="choice-arrow">→</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4: 연락처 입력 -->
+    <div class="step" data-step="4">
+      <div class="step-inner">
+        <div class="step-num">04 / 04</div>
+        <h2 class="step-q">마지막으로<br><span class="gold">매장 정보</span>만 남겨주세요</h2>
+        <p class="step-sub">주소를 입력하시면 먼저 파악하고 연락드립니다</p>
+        <div class="input-group">
+          <div class="input-wrap">
+            <label class="input-label">매장 지번 주소 <span class="input-req">*</span></label>
+            <input type="text" class="app-input" id="i-address" placeholder="예) 경기 남양주시 다산동 123-45">
+          </div>
+          <div class="input-wrap">
+            <label class="input-label">프랜차이즈 상호명 <span class="input-req">*</span></label>
+            <input type="text" class="app-input" id="i-brand" placeholder="예) BBQ 다산점">
+          </div>
+          <div class="input-wrap">
+            <label class="input-label">성함</label>
+            <input type="text" class="app-input" id="i-name" placeholder="홍길동">
+          </div>
+          <div class="input-wrap">
+            <label class="input-label">연락처</label>
+            <input type="tel" class="app-input" id="i-phone" placeholder="010-0000-0000">
+          </div>
+        </div>
+        <button class="cta-btn" id="submit-btn" onclick="submitForm()">매장 분석 후 연락받기 →</button>
+      </div>
+    </div>
+
+    <!-- STEP 5: 완료 -->
+    <div class="step" data-step="5">
+      <div class="step-inner" style="text-align:center;">
+        <div class="done-icon">✓</div>
+        <div class="done-title">신청 완료됐습니다</div>
+        <p class="done-sub">
+          매장을 먼저 파악한 뒤<br>
+          빠른 시간 내에 연락드리겠습니다.
+        </p>
+        <div class="done-info">
+          <div class="done-item">
+            <div class="done-item-icon">📞</div>
+            <div>
+              <strong>010-2461-0912</strong>
+              <span style="display:block; font-size:0.78rem; color:rgba(240,236,227,0.4); margin-top:2px;">지금 바로 통화 가능</span>
+            </div>
+          </div>
+          <div class="done-item">
+            <div class="done-item-icon">📍</div>
+            <div>
+              <strong>경기 남양주시 다산동 6063</strong>
+              <span style="display:block; font-size:0.78rem; color:rgba(240,236,227,0.4); margin-top:2px;">방문 상담 — 예약 필수</span>
+            </div>
+          </div>
+        </div>
+        <a href="tel:010-2461-0912" class="call-btn">📞 지금 바로 전화하기</a>
+        <a href="javascript:void(0)" onclick="showServiceDetail()" style="display:block; width:100%; padding:1rem; background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.35); border-radius:12px; color:#c9a84c; font-size:0.92rem; font-weight:600; text-decoration:none; text-align:center; margin-top:0.8rem;">
+          연락 기다리시는 동안 — 서비스 전체 보기 →
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div></div>
+
+<!-- 서비스 상세 섹션 (완료 후 스크롤) -->
+<div id="service-detail" style="display:none;">
+
+  <!-- WHY FREE 배너 -->
+  <section class="detail-section">
+    <div class="free-banner">
+      <div class="free-banner-icon">✦</div>
+      <div>
+        <div class="free-banner-title">가맹점주님께 청구되는 비용은 없습니다</div>
+        <div class="free-banner-sub">분석 · 매칭 · 방향 제시 전 과정 무료</div>
+      </div>
+    </div>
+
+    <div class="detail-eyebrow">Services</div>
+    <h2 class="detail-title">전문 서비스 영역</h2>
+    <p class="detail-sub">법적 검토부터 브랜드 매칭까지. 업종전환의 모든 단계를 한 곳에서.</p>
+
+    <div class="svc-list">
+      <div class="svc-item">
+        <div class="svc-top">
+          <span class="svc-num">01</span>
+          <span class="svc-tag">리스크 제거</span>
+        </div>
+        <div class="svc-name">계약 분석 & 법적 검토</div>
+        <p class="svc-desc">위약금 구조, 영업 제한 조항을 면밀히 분석합니다. 법무법인 협력 네트워크로 리스크를 최소화합니다.</p>
+      </div>
+      <div class="svc-item">
+        <div class="svc-top">
+          <span class="svc-num">02</span>
+          <span class="svc-tag">데이터 분석</span>
+        </div>
+        <div class="svc-name">상권 & 업종 적합도 분석</div>
+        <p class="svc-desc">유동 인구, 경쟁 강도, 소비 패턴을 데이터 기반으로 분석해 성공 가능성 높은 업종을 추천합니다.</p>
+      </div>
+      <div class="svc-item">
+        <div class="svc-top">
+          <span class="svc-num">03</span>
+          <span class="svc-tag">최적 경로</span>
+        </div>
+        <div class="svc-name">전환 로드맵 설계</div>
+        <p class="svc-desc">인테리어 활용도, 설비 재사용 가능성을 검토해 비용을 줄이고 전환 기간을 단축하는 경로를 설계합니다.</p>
+      </div>
+      <div class="svc-item highlight-card">
+        <div class="svc-top">
+          <span class="svc-num">04</span>
+          <span class="svc-tag">400개+ DB</span>
+        </div>
+        <div class="svc-name">색감·마감재 기반 브랜드 매칭</div>
+        <p class="svc-desc">현재 매장 벽면·바닥재·천장 마감을 분석해 교체 없이 그대로 쓸 수 있는 브랜드를 400개 이상 DB에서 찾아드립니다.</p>
+      </div>
+      <div class="svc-item">
+        <div class="svc-top">
+          <span class="svc-num">05</span>
+          <span class="svc-tag">핵심 노하우</span>
+        </div>
+        <div class="svc-name">인테리어 최소화 전략</div>
+        <p class="svc-desc">유사한 톤과 소재를 쓰는 브랜드를 매칭해 철거·재시공 범위를 줄입니다. 시공사는 자유롭게 선택하세요.</p>
+      </div>
+      <div class="svc-item">
+        <div class="svc-top">
+          <span class="svc-num">06</span>
+          <span class="svc-tag">오픈 후 케어</span>
+        </div>
+        <div class="svc-name">오픈 후 사후 관리</div>
+        <p class="svc-desc">재오픈 이후 궁금한 점이 생기면 언제든 연락주세요. 담당자가 계속 함께합니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 진행 절차 -->
+  <section class="detail-section" style="background:rgba(255,255,255,0.02);">
+    <div class="detail-eyebrow">Process</div>
+    <h2 class="detail-title">진행 절차</h2>
+    <p class="detail-sub">상담부터 오픈까지 평균 10일. 담당자가 처음부터 끝까지 함께합니다.</p>
+    <div class="process-list">
+      <div class="process-item">
+        <div class="process-left">
+          <div class="process-step-num">01</div>
+          <div class="process-line"></div>
+        </div>
+        <div class="process-right">
+          <div class="process-header">
+            <div class="process-name">초기 상담</div>
+            <span class="process-duration">당일</span>
+          </div>
+          <p class="process-desc">현재 상황과 고민을 듣습니다. 전화, 방문 모두 가능합니다.</p>
+        </div>
+      </div>
+      <div class="process-item">
+        <div class="process-left">
+          <div class="process-step-num">02</div>
+          <div class="process-line"></div>
+        </div>
+        <div class="process-right">
+          <div class="process-header">
+            <div class="process-name">계약서 & 현장 분석</div>
+            <span class="process-duration">당일</span>
+          </div>
+          <p class="process-desc">계약서를 검토하고 현장을 방문해 전환 가능성과 리스크를 진단합니다.</p>
+        </div>
+      </div>
+      <div class="process-item">
+        <div class="process-left">
+          <div class="process-step-num">03</div>
+          <div class="process-line"></div>
+        </div>
+        <div class="process-right">
+          <div class="process-header">
+            <div class="process-name">업종 & 브랜드 제안</div>
+            <span class="process-duration">당일</span>
+          </div>
+          <p class="process-desc">분석 결과를 바탕으로 2~3가지 전환 시나리오와 예상 수익을 제시합니다.</p>
+        </div>
+      </div>
+      <div class="process-item">
+        <div class="process-left">
+          <div class="process-step-num">04</div>
+          <div class="process-line"></div>
+        </div>
+        <div class="process-right">
+          <div class="process-header">
+            <div class="process-name">계약 해지 & 협상 대행</div>
+            <span class="process-duration">1일</span>
+          </div>
+          <p class="process-desc">기존 본사와의 해지 협상과 위약금 협의를 직접 대행합니다.</p>
+        </div>
+      </div>
+      <div class="process-item">
+        <div class="process-left">
+          <div class="process-step-num">05</div>
+          <div class="process-line"></div>
+        </div>
+        <div class="process-right">
+          <div class="process-header">
+            <div class="process-name">신규 계약 & 인테리어</div>
+            <span class="process-duration">3~5일</span>
+          </div>
+          <p class="process-desc">새 브랜드 계약을 체결하고 인테리어를 최단 기간 내 마무리합니다.</p>
+        </div>
+      </div>
+      <div class="process-item">
+        <div class="process-left">
+          <div class="process-step-num">06</div>
+        </div>
+        <div class="process-right">
+          <div class="process-header">
+            <div class="process-name">오픈 & 사후 지원</div>
+            <span class="process-duration" style="background:rgba(201,168,76,0.2); color:#c9a84c;">오픈 🎉</span>
+          </div>
+          <p class="process-desc">오픈 이후에도 궁금한 점이 생기면 언제든 연락주세요. 담당자가 계속 함께합니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 선택 이유 -->
+  <section class="detail-section">
+    <div class="detail-eyebrow">Why Us</div>
+    <h2 class="detail-title">선택해야 하는 이유</h2>
+    <div class="why-list">
+      <div class="why-card" style="border-top-color:#8b1a1a">
+        <div class="why-icon">⚖️</div>
+        <div class="why-name">법적 리스크 최소화</div>
+        <p class="why-desc">손해배상, 영업금지 가처분 등 법적 문제를 사전에 방지합니다. 법무법인과 상시 협력 체계를 유지합니다.</p>
+      </div>
+      <div class="why-card" style="border-top-color:#1a4a8b">
+        <div class="why-icon">🎯</div>
+        <div class="why-name">데이터 기반 업종 추천</div>
+        <p class="why-desc">감에 의존하지 않습니다. 상권 빅데이터, 경쟁 분석, 유동 인구 패턴을 분석해 성공 가능성이 높은 업종만 제안합니다.</p>
+      </div>
+      <div class="why-card" style="border-top-color:#1a6b3a">
+        <div class="why-icon">💰</div>
+        <div class="why-name">공사비 최소화 매칭</div>
+        <p class="why-desc">현재 매장 인테리어를 분석해 기존 마감재와 가장 잘 맞는 브랜드를 찾아냅니다. 철거·재시공 범위가 줄어든 만큼 전환 비용도 낮아집니다.</p>
+      </div>
+      <div class="why-card" style="border-top-color:#6b4a1a">
+        <div class="why-icon">🤝</div>
+        <div class="why-name">전담 컨설턴트 1:1 관리</div>
+        <p class="why-desc">상담부터 오픈까지 담당자 한 명이 끝까지 책임집니다. 중간에 바뀌지 않습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 하단 CTA -->
+  <section class="detail-section" style="text-align:center; padding-bottom:4rem;">
+    <p style="font-size:0.9rem; color:rgba(240,236,227,0.4); margin-bottom:1.4rem;">아직 상담 신청 전이라면</p>
+    <a href="./changie.html" class="cta-btn" style="display:inline-block; text-decoration:none; padding:1rem 2.4rem; font-size:1rem;">상담 신청하러 가기 →</a>
+  </section>
+
+</div>
+
+<script>
+
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhvaUAmMkzGgLnTUFfD8e2T9IYe4fdazq2y_0ZawTm4q8hab19wTJOF8O9AaDsf78t/exec';
+
+let current = 0;
+const total = 6; // 0~5 + 2.5
+const answers = {};
+
+function updateProgress() {
+  const pct = current === 0 ? 0 : Math.round((current / (total - 1)) * 100);
+  document.getElementById('progress').style.width = pct + '%';
+  const backBtn = document.getElementById('back-btn');
+  if (current > 0 && current < total - 1) {
+    backBtn.classList.add('visible');
+  } else {
+    backBtn.classList.remove('visible');
+  }
+}
+
+function nextStep() {
+  if (current >= total) return;
+  const allSteps = document.querySelectorAll('.step');
+  allSteps[current].classList.remove('active');
+  allSteps[current].classList.add('out');
+  current++;
+  allSteps[current].classList.add('active');
+  setTimeout(() => allSteps[current - 1].classList.remove('out'), 500);
+  updateProgress();
+}
+
+function showServiceDetail() {
+  document.querySelector('.app').style.display = 'none';
+  document.getElementById('service-detail').style.display = 'block';
+  document.body.style.overflow = 'auto';
+  document.documentElement.style.overflow = 'auto';
+  window.scrollTo(0,0);
+}
+
+function scrollToTop() {
+  document.getElementById('service-detail').style.display = 'none';
+  document.querySelector('.app').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  document.documentElement.style.overflow = 'hidden';
+  current = 0;
+  document.querySelectorAll('.step').forEach((s,i) => {
+    s.classList.remove('active','out');
+    if(i===0) s.classList.add('active');
+  });
+  updateProgress();
+  window.scrollTo(0,0);
+}
+
+function prevStep() {
+  if (current <= 0) return;
+  const steps = document.querySelectorAll('.step');
+  steps[current].classList.remove('active');
+  steps[current].style.transform = 'translateX(60px)';
+  setTimeout(() => { steps[current].style.transform = ''; }, 500);
+  current--;
+  steps[current].classList.add('active');
+  steps[current].classList.remove('out');
+  updateProgress();
+}
+
+function selectChoice(btn, stepNum) {
+  // 선택 표시
+  btn.closest('.choices').querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  answers['step' + stepNum] = btn.querySelector('strong').textContent;
+  // 0.3초 후 자동 다음
+  setTimeout(() => nextStep(), 280);
+}
+
+async function submitForm() {
+  const address = document.getElementById('i-address').value.trim();
+  const brand   = document.getElementById('i-brand').value.trim();
+  const name    = document.getElementById('i-name').value.trim();
+  const phone   = document.getElementById('i-phone').value.trim();
+  const btn     = document.getElementById('submit-btn');
+
+  if (!address) { alert('매장 주소를 입력해 주세요.'); return; }
+  if (!brand)   { alert('프랜차이즈 상호명을 입력해 주세요.'); return; }
+
+  btn.textContent = '전송 중...';
+  btn.disabled = true;
+
+  const payload = {
+    address, brand, name, phone,
+    situation: answers.step1 || '',
+    interior:  answers.step2 || '',
+    industry:  answers.step3 || ''
+  };
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch(e) {}
+
+  nextStep();
+}
+
+updateProgress();
+</script>
+</body>
+</html>
