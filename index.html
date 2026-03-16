@@ -879,6 +879,16 @@ async function submitForm() {
 }
 
 updateProgress();
+
+// 서비스 페이지에서 돌아온 경우 3번으로 이동
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('step') === '3') {
+  const allSteps = document.querySelectorAll('.step');
+  allSteps[0].classList.remove('active');
+  current = 3;
+  allSteps[3].classList.add('active');
+  updateProgress();
+}
 </script>
 </body>
 </html>
