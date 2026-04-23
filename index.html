@@ -578,9 +578,9 @@ body { font-family:'Noto Sans KR', sans-serif; color:#f0ece3; }
           </div>
         </div>
         <a href="tel:010-2461-0912" class="call-btn">📞 지금 바로 전화하기</a>
-        <a href="javascript:void(0)" onclick="showServiceDetail()" style="display:block; width:100%; padding:1rem; background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.35); border-radius:12px; color:#c9a84c; font-size:0.92rem; font-weight:600; text-decoration:none; text-align:center; margin-top:0.8rem;">
+        <button onclick="showServiceDetail()" style="display:block; width:100%; padding:1rem; background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.35); border-radius:12px; color:#c9a84c; font-size:0.92rem; font-weight:600; cursor:pointer; text-align:center; margin-top:0.8rem; font-family:'Noto Sans KR', sans-serif;">
           연락 기다리시는 동안 — 서비스 전체 보기 →
-        </a>
+        </button>
       </div>
     </div>
 
@@ -773,7 +773,7 @@ body { font-family:'Noto Sans KR', sans-serif; color:#f0ece3; }
   <!-- 하단 CTA -->
   <section class="detail-section" style="text-align:center; padding-bottom:4rem;">
     <p style="font-size:0.9rem; color:rgba(240,236,227,0.4); margin-bottom:1.4rem;">아직 상담 신청 전이라면</p>
-    <a href="./changie.html" class="cta-btn" style="display:inline-block; text-decoration:none; padding:1rem 2.4rem; font-size:1rem;">상담 신청하러 가기 →</a>
+    <a href="#" onclick="scrollToTop()" class="cta-btn" style="display:inline-block; text-decoration:none; padding:1rem 2.4rem; font-size:1rem;">상담 신청하러 가기 →</a>
   </section>
 
 </div>
@@ -811,23 +811,18 @@ function nextStep() {
 function showServiceDetail() {
   document.querySelector('.app').style.display = 'none';
   document.getElementById('service-detail').style.display = 'block';
-  document.body.style.overflow = 'auto';
-  document.documentElement.style.overflow = 'auto';
   window.scrollTo(0,0);
 }
 
 function scrollToTop() {
   document.getElementById('service-detail').style.display = 'none';
   document.querySelector('.app').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-  document.documentElement.style.overflow = 'hidden';
   current = 0;
   document.querySelectorAll('.step').forEach((s,i) => {
     s.classList.remove('active','out');
     if(i===0) s.classList.add('active');
   });
   updateProgress();
-  window.scrollTo(0,0);
 }
 
 function prevStep() {
